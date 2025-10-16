@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Boat Crew Weight Balancer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4C4BC7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .crew-member {
+            cursor: grab;
+        }
+        .crew-member:active {
+            cursor: grabbing;
+        }
+        .position-slot {
+            min-height: 60px;
+            transition: all 0.2s ease;
+        }
+        .position-slot.drag-over {
+            background-color: rgba(93, 92, 222, 0.1);
+            border-color: #5D5CDE;
+        }
+        .boat-position {
+            border: 2px dashed #e5e7eb;
+            border-radius: 8px;
+        }
+        .boat-position.occupied {
+            border: 2px solid #5D5CDE;
+            background-color: rgba(93, 92, 222, 0.05);
+        }
+        .gender-male {
+            background: linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%);
+            color: white;
+            border-color: #1E40AF;
+        }
+        .gender-female {
+            background: linear-gradient(135deg, #EC4899 0%, #BE185D 100%);
+            color: white;
+            border-color: #BE185D;
+        }
+        .gender-other {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            border-color: #059669;
+        }
+        .gender-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .gender-male-indicator {
+            background-color: #3B82F6;
+        }
+        .gender-female-indicator {
+            background-color: #EC4899;
+        }
+        .gender-other-indicator {
+            background-color: #10B981;
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-primary mb-2">Dragon Boat Crew Weight Balancer</h1>
+            <p class="text-gray-600 dark:text-gray-400">Optimize your crew positioning for perfect balance</p>
+        </div>
+
+        <!-- Crew Roster Section -->
+        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Crew Roster</h2>
+            
+            <!-- Add Member Form -->
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input type="text" id="memberName" placeholder="Member Name" 
+                       class="flex-1 px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select id="memberGender" 
+                        class="flex-1 sm:flex-none sm:w-24 px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                </select>
+                <input type="number" id="memberWeight" placeholder="Weight (kg)" step="0.1"
+                       class="flex-1 sm:flex-none sm:w-32 px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent">
+                <button onclick="addMember()" 
+                        class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
+                    Add Member
+                </button>
+            </div>
+
+            <!-- Available Members -->
+            <div class="mb-4">
+                <h3 class="font-medium mb-2">Available Members</h3>
+                <div id="availableMembers" class="flex flex-wrap gap-2 min-h-[40px] p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                    <!-- Members will be added here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Boat Layout and Statistics -->
+        <div class="grid lg:grid-cols-3 gap-8">
+            <!-- Boat Diagram -->
+            <div class="lg:col-span-2">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Boat Layout</h2>
+                        <div class="flex gap-4 items-center">
+                            <div class="flex gap-2 items-center">
+                                <label class="text-sm">Paddlers per side:</label>
+                                <select id="paddlersPerSide" onchange="updateBoatLayout()" 
+                                        class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="7">7</option>
+                                    <option value="8">8</option>
+                                    <option value="9">9</option>
+                                    <option value="10" selected>10</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <button onclick="toggleWeightsDisplay()" 
+                                        id="weightsToggleBtn"
+                                        class="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                                    ??? Hide Weights
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="boatDiagram" class="relative">
+                        <!-- Boat will be generated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weight Statistics -->
+            <div class="space-y-6">
+                <!-- Summary Stats -->
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Weight Summary</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span>Total Weight:</span>
+                            <span id="totalWeight" class="font-medium">0 kg</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Front Half:</span>
+                            <span id="frontWeight" class="font-medium">0 kg</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Rear Half:</span>
+                            <span id="rearWeight" class="font-medium">0 kg</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-2">
+                            <span>Front/Rear Diff:</span>
+                            <span id="frontRearDiff" class="font-medium">0 kg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <h3 class="font-semibold mb-3">Left vs Right Balance</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span>Left Side:</span>
+                            <span id="leftWeight" class="font-medium">0 kg</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Right Side:</span>
+                            <span id="rightWeight" class="font-medium">0 kg</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-2">
+                            <span>Left/Right Diff:</span>
+                            <span id="leftRightDiff" class="font-medium">0 kg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <h3 class="font-semibold mb-3">Gender Distribution</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="flex items-center">
+                                <span class="gender-indicator gender-male-indicator"></span>
+                                Male:
+                            </span>
+                            <span id="maleCount" class="font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="flex items-center">
+                                <span class="gender-indicator gender-female-indicator"></span>
+                                Female:
+                            </span>
+                            <span id="femaleCount" class="font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="flex items-center">
+                                <span class="gender-indicator gender-other-indicator"></span>
+                                Other:
+                            </span>
+                            <span id="otherCount" class="font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-2">
+                            <span>Total Assigned:</span>
+                            <span id="totalAssigned" class="font-medium">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="space-y-3">
+                    <button onclick="clearAllPositions()" 
+                            class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                        Clear All Positions
+                    </button>
+                    <button onclick="saveCrewList()" 
+                            class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        Save Crew List
+                    </button>
+                    <button onclick="shareCrewList()" 
+                            class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
+                        Share Crew List
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold mb-4">Share Crew List</h3>
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" id="hideWeights" class="mr-2">
+                    <span>Hide weights for privacy</span>
+                </label>
+            </div>
+            <div class="space-y-3">
+                <button onclick="generateShareLink()" 
+                        class="w-full px-4 py-2 bg-primary text-white hover:bg-primary-dark rounded transition-colors">
+                    ?? Share as Link
+                </button>
+                <button onclick="shareAsImage()" 
+                        class="w-full px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded transition-colors">
+                    ?? Share as Image
+                </button>
+                <button onclick="closeShareModal()" 
+                        class="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let crewMembers = [];
+        let boatPositions = {};
+        let paddlersPerSide = 10;
+        let weightsHidden = false;
+
+        // Dark mode support
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            updateBoatLayout();
+            loadSavedData();
+        });
+
+        function addMember() {
+            const nameInput = document.getElementById('memberName');
+            const genderInput = document.getElementById('memberGender');
+            const weightInput = document.getElementById('memberWeight');
+            
+            const name = nameInput.value.trim();
+            const gender = genderInput.value;
+            const weight = parseFloat(weightInput.value);
+            
+            if (!name) {
+                showAlert('Please enter a member name');
+                return;
+            }
+            
+            if (!weight || weight <= 0) {
+                showAlert('Please enter a valid weight');
+                return;
+            }
+            
+            const member = {
+                id: Date.now().toString(),
+                name: name,
+                gender: gender,
+                weight: weight
+            };
+            
+            crewMembers.push(member);
+            renderAvailableMembers();
+            
+            nameInput.value = '';
+            weightInput.value = '';
+            nameInput.focus();
+        }
+
+        function showAlert(message) {
+            const alert = document.createElement('div');
+            alert.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            alert.textContent = message;
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
+
+        function renderAvailableMembers() {
+            const container = document.getElementById('availableMembers');
+            const assignedMemberIds = Object.values(boatPositions).map(pos => pos.member?.id).filter(Boolean);
+            const availableMembers = crewMembers.filter(member => !assignedMemberIds.includes(member.id));
+            
+            container.innerHTML = availableMembers.map(member => `
+                <div class="crew-member gender-${member.gender} border rounded-lg px-3 py-2 text-sm shadow-sm"
+                     draggable="true" 
+                     data-member-id="${member.id}"
+                     ondragstart="handleDragStart(event)">
+                    <div class="font-medium">${member.name}</div>
+                    <div class="opacity-90">${member.weight} kg</div>
+                    <button onclick="removeMember('${member.id}')" 
+                            class="ml-2 text-white hover:text-red-200 text-xs font-bold">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function removeMember(memberId) {
+            crewMembers = crewMembers.filter(member => member.id !== memberId);
+            
+            // Remove from position if assigned
+            for (const [positionId, position] of Object.entries(boatPositions)) {
+                if (position.member?.id === memberId) {
+                    position.member = null;
+                }
+            }
+            
+            renderAvailableMembers();
+            renderBoatPositions();
+            updateStatistics();
+        }
+
+        function updateBoatLayout() {
+            paddlersPerSide = parseInt(document.getElementById('paddlersPerSide').value);
+            generateBoatLayout();
+            renderBoatPositions();
+            updateStatistics();
+        }
+
+        function generateBoatLayout() {
+            const container = document.getElementById('boatDiagram');
+            
+            // Initialize positions
+            boatPositions = {
+                drummer: { type: 'drummer', member: null, side: 'center', position: 0 }
+            };
+            
+            // Add paddler positions
+            for (let i = 1; i <= paddlersPerSide; i++) {
+                boatPositions[`left${i}`] = { type: 'paddler', member: null, side: 'left', position: i };
+                boatPositions[`right${i}`] = { type: 'paddler', member: null, side: 'right', position: i };
+            }
+            
+            boatPositions.helm = { type: 'helm', member: null, side: 'center', position: paddlersPerSide + 1 };
+            
+            // Generate HTML
+            let html = '<div class="boat-container">';
+            
+            // Drummer (front)
+            html += `
+                <div class="mb-4">
+                    <div class="text-center font-medium mb-2">Front (Drummer)</div>
+                    <div class="flex justify-center">
+                        <div id="pos-drummer" class="boat-position position-slot w-24 h-16 flex flex-col items-center justify-center text-xs"
+                             ondrop="handleDrop(event, 'drummer')" 
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)">
+                            <div class="font-medium">Drummer</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Paddlers
+            html += '<div class="space-y-2 mb-4">';
+            for (let i = 1; i <= paddlersPerSide; i++) {
+                html += `
+                    <div class="flex justify-between items-center gap-4">
+                        <div id="pos-left${i}" class="boat-position position-slot w-24 h-12 flex flex-col items-center justify-center text-xs"
+                             ondrop="handleDrop(event, 'left${i}')" 
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)">
+                            <div class="font-medium">L${i}</div>
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Row ${i}</div>
+                        <div id="pos-right${i}" class="boat-position position-slot w-24 h-12 flex flex-col items-center justify-center text-xs"
+                             ondrop="handleDrop(event, 'right${i}')" 
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)">
+                            <div class="font-medium">R${i}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            
+            // Helm (rear)
+            html += `
+                <div>
+                    <div class="text-center font-medium mb-2">Rear (Helm)</div>
+                    <div class="flex justify-center">
+                        <div id="pos-helm" class="boat-position position-slot w-24 h-16 flex flex-col items-center justify-center text-xs"
+                             ondrop="handleDrop(event, 'helm')" 
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)">
+                            <div class="font-medium">Helm</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderBoatPositions() {
+            for (const [positionId, position] of Object.entries(boatPositions)) {
+                const element = document.getElementById(`pos-${positionId}`);
+                if (!element) continue;
+                
+                if (position.member) {
+                    element.className = 'boat-position position-slot w-24 h-12 flex flex-col items-center justify-center text-xs occupied';
+                    const weightDisplay = weightsHidden ? '' : `<div class="text-xs text-gray-600 dark:text-gray-400">${position.member.weight}kg</div>`;
+                    element.innerHTML = `
+                        <div class="font-medium text-xs flex items-center">
+                            <span class="gender-indicator gender-${position.member.gender}-indicator mr-1"></span>
+                            ${position.member.name}
+                        </div>
+                        ${weightDisplay}
+                        <button onclick="removeFromPosition('${positionId}')" 
+                                class="text-red-500 hover:text-red-700 text-xs">上水</button>
+                    `;
+                } else {
+                    element.className = 'boat-position position-slot w-24 h-12 flex flex-col items-center justify-center text-xs';
+                    const label = positionId === 'drummer' ? 'Drummer' : 
+                                 positionId === 'helm' ? 'Helm' : 
+                                 positionId.charAt(0).toUpperCase() + positionId.slice(1);
+                    element.innerHTML = `<div class="font-medium">${label}</div>`;
+                }
+            }
+            renderAvailableMembers();
+        }
+
+        function removeFromPosition(positionId) {
+            boatPositions[positionId].member = null;
+            renderBoatPositions();
+            updateStatistics();
+        }
+
+        function handleDragStart(event) {
+            event.dataTransfer.setData('text/plain', event.target.dataset.memberId);
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(event, positionId) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            
+            const memberId = event.dataTransfer.getData('text/plain');
+            const member = crewMembers.find(m => m.id === memberId);
+            
+            if (member) {
+                // Remove member from any existing position
+                for (const position of Object.values(boatPositions)) {
+                    if (position.member?.id === memberId) {
+                        position.member = null;
+                    }
+                }
+                
+                // Assign to new position
+                boatPositions[positionId].member = member;
+                renderBoatPositions();
+                updateStatistics();
+            }
+        }
+
+        function updateStatistics() {
+            let totalWeight = 0;
+            let frontWeight = 0;
+            let rearWeight = 0;
+            let leftWeight = 0;
+            let rightWeight = 0;
+            let maleCount = 0;
+            let femaleCount = 0;
+            let otherCount = 0;
+            let totalAssigned = 0;
+            
+            for (const [positionId, position] of Object.entries(boatPositions)) {
+                if (!position.member) continue;
+                
+                const weight = position.member.weight;
+                const gender = position.member.gender;
+                totalWeight += weight;
+                totalAssigned++;
+                
+                // Count genders
+                if (gender === 'male') maleCount++;
+                else if (gender === 'female') femaleCount++;
+                else otherCount++;
+                
+                if (position.type === 'drummer' || (position.type === 'paddler' && position.position <= paddlersPerSide / 2)) {
+                    frontWeight += weight;
+                } else {
+                    rearWeight += weight;
+                }
+                
+                if (position.side === 'left') {
+                    leftWeight += weight;
+                } else if (position.side === 'right') {
+                    rightWeight += weight;
+                }
+            }
+            
+            const frontRearDiff = Math.abs(frontWeight - rearWeight);
+            const leftRightDiff = Math.abs(leftWeight - rightWeight);
+            
+            document.getElementById('totalWeight').textContent = `${totalWeight.toFixed(1)} kg`;
+            document.getElementById('frontWeight').textContent = `${frontWeight.toFixed(1)} kg`;
+            document.getElementById('rearWeight').textContent = `${rearWeight.toFixed(1)} kg`;
+            document.getElementById('frontRearDiff').textContent = `${frontRearDiff.toFixed(1)} kg`;
+            document.getElementById('leftWeight').textContent = `${leftWeight.toFixed(1)} kg`;
+            document.getElementById('rightWeight').textContent = `${rightWeight.toFixed(1)} kg`;
+            document.getElementById('leftRightDiff').textContent = `${leftRightDiff.toFixed(1)} kg`;
+            
+            // Update gender statistics
+            document.getElementById('maleCount').textContent = maleCount;
+            document.getElementById('femaleCount').textContent = femaleCount;
+            document.getElementById('otherCount').textContent = otherCount;
+            document.getElementById('totalAssigned').textContent = totalAssigned;
+            
+            // Color code differences
+            const frontRearElement = document.getElementById('frontRearDiff');
+            const leftRightElement = document.getElementById('leftRightDiff');
+            
+            frontRearElement.className = frontRearDiff > 10 ? 'font-medium text-red-500' : 'font-medium text-green-600';
+            leftRightElement.className = leftRightDiff > 5 ? 'font-medium text-red-500' : 'font-medium text-green-600';
+        }
+
+        function clearAllPositions() {
+            showConfirmDialog('Are you sure you want to clear all positions?', () => {
+                for (const position of Object.values(boatPositions)) {
+                    position.member = null;
+                }
+                renderBoatPositions();
+                updateStatistics();
+            });
+        }
+
+        function showConfirmDialog(message, onConfirm) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
+                    <p class="text-gray-700 dark:text-gray-300 mb-4">${message}</p>
+                    <div class="flex justify-end space-x-3">
+                        <button class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" onclick="this.closest('.fixed').remove()">Cancel</button>
+                        <button class="px-4 py-2 bg-primary text-white hover:bg-primary-dark rounded" onclick="this.closest('.fixed').remove(); (${onConfirm})()">Confirm</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function saveCrewList() {
+            const data = {
+                crewMembers: crewMembers,
+                boatPositions: boatPositions,
+                paddlersPerSide: paddlersPerSide,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('dragonBoatCrewList', JSON.stringify(data));
+            
+            const alert = document.createElement('div');
+            alert.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            alert.textContent = 'Crew list saved successfully!';
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
+
+        function loadSavedData() {
+            const saved = localStorage.getItem('dragonBoatCrewList');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    crewMembers = data.crewMembers || [];
+                    boatPositions = data.boatPositions || {};
+                    paddlersPerSide = data.paddlersPerSide || 10;
+                    
+                    document.getElementById('paddlersPerSide').value = paddlersPerSide;
+                    updateBoatLayout();
+                    renderAvailableMembers();
+                    renderBoatPositions();
+                    updateStatistics();
+                } catch (e) {
+                    console.error('Error loading saved data:', e);
+                }
+            }
+        }
+
+        function shareCrewList() {
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function generateShareLink() {
+            const hideWeights = document.getElementById('hideWeights').checked;
+            const data = {
+                crewMembers: crewMembers,
+                boatPositions: boatPositions,
+                paddlersPerSide: paddlersPerSide,
+                hideWeights: hideWeights
+            };
+            
+            const encodedData = encodeURIComponent(JSON.stringify(data));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encodedData}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                closeShareModal();
+                const alert = document.createElement('div');
+                alert.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                alert.textContent = 'Share link copied to clipboard!';
+                document.body.appendChild(alert);
+                setTimeout(() => alert.remove(), 3000);
+            }).catch(() => {
+                // Fallback for browsers that don't support clipboard API
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+                        <h3 class="text-lg font-semibold mb-4">Share Link</h3>
+                        <textarea class="w-full h-24 p-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700" readonly>${shareUrl}</textarea>
+                        <div class="flex justify-end mt-4">
+                            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-primary text-white hover:bg-primary-dark rounded">Close</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                closeShareModal();
+            });
+        }
+
+        // Load shared data from URL if present
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sharedData = urlParams.get('data');
+            
+            if (sharedData) {
+                try {
+                    const data = JSON.parse(decodeURIComponent(sharedData));
+                    crewMembers = data.crewMembers || [];
+                    boatPositions = data.boatPositions || {};
+                    paddlersPerSide = data.paddlersPerSide || 10;
+                    
+                    // Hide weights if requested
+                    if (data.hideWeights) {
+                        crewMembers.forEach(member => member.weight = '***');
+                        for (const position of Object.values(boatPositions)) {
+                            if (position.member) {
+                                position.member.weight = '***';
+                            }
+                        }
+                    }
+                    
+                    document.getElementById('paddlersPerSide').value = paddlersPerSide;
+                    updateBoatLayout();
+                    renderAvailableMembers();
+                    renderBoatPositions();
+                    if (!data.hideWeights) {
+                        updateStatistics();
+                    }
+                } catch (e) {
+                    console.error('Error loading shared data:', e);
+                }
+            }
+        });
+
+        function shareAsImage() {
+            const hideWeights = document.getElementById('hideWeights').checked;
+            
+            // Show loading state
+            const loadingModal = document.createElement('div');
+            loadingModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60';
+            loadingModal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span>Generating image...</span>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingModal);
+            
+            // Create a temporary container for the image
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.top = '-9999px';
+            tempContainer.style.background = 'white';
+            tempContainer.style.padding = '20px';
+            tempContainer.style.fontFamily = 'Arial, sans-serif';
+            document.body.appendChild(tempContainer);
+            
+            // Create the boat diagram content for the image
+            let imageContent = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #5D5CDE; font-size: 24px; font-weight: bold; margin: 0;">Dragon Boat Crew Layout</h1>
+                    <p style="color: #666; margin: 5px 0;">${new Date().toLocaleDateString()}</p>
+                </div>
+            `;
+            
+            // Add boat diagram
+            imageContent += '<div style="display: flex; flex-direction: column; align-items: center;">';
+            
+            // Drummer
+            imageContent += `
+                <div style="margin-bottom: 15px;">
+                    <div style="text-align: center; font-weight: bold; margin-bottom: 8px;">Front (Drummer)</div>
+                    <div style="display: flex; justify-content: center;">
+                        ${createPositionForImage('drummer', hideWeights)}
+                    </div>
+                </div>
+            `;
+            
+            // Paddlers
+            imageContent += '<div style="margin-bottom: 15px;">';
+            for (let i = 1; i <= paddlersPerSide; i++) {
+                imageContent += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 5px 0; gap: 20px;">
+                        ${createPositionForImage(`left${i}`, hideWeights)}
+                        <div style="font-size: 12px; color: #666; width: 50px; text-align: center;">Row ${i}</div>
+                        ${createPositionForImage(`right${i}`, hideWeights)}
+                    </div>
+                `;
+            }
+            imageContent += '</div>';
+            
+            // Helm
+            imageContent += `
+                <div>
+                    <div style="text-align: center; font-weight: bold; margin-bottom: 8px;">Rear (Helm)</div>
+                    <div style="display: flex; justify-content: center;">
+                        ${createPositionForImage('helm', hideWeights)}
+                    </div>
+                </div>
+            `;
+            
+            imageContent += '</div>';
+            
+            // Add statistics if weights are not hidden
+            if (!hideWeights) {
+                imageContent += createStatisticsForImage();
+            }
+            
+            tempContainer.innerHTML = imageContent;
+            
+            // Generate image using html2canvas
+            html2canvas(tempContainer, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                width: 600,
+                height: tempContainer.scrollHeight + 40
+            }).then(canvas => {
+                // Remove temporary container and loading modal
+                document.body.removeChild(tempContainer);
+                document.body.removeChild(loadingModal);
+                
+                // Create download link
+                const link = document.createElement('a');
+                link.download = `dragon-boat-crew-${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                
+                closeShareModal();
+                
+                const alert = document.createElement('div');
+                alert.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                alert.textContent = 'Crew layout image downloaded!';
+                document.body.appendChild(alert);
+                setTimeout(() => alert.remove(), 3000);
+            }).catch(error => {
+                document.body.removeChild(tempContainer);
+                document.body.removeChild(loadingModal);
+                console.error('Error generating image:', error);
+                
+                const alert = document.createElement('div');
+                alert.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                alert.textContent = 'Error generating image. Please try again.';
+                document.body.appendChild(alert);
+                setTimeout(() => alert.remove(), 3000);
+            });
+        }
+        
+        function createPositionForImage(positionId, hideWeights) {
+            const position = boatPositions[positionId];
+            const genderColors = {
+                male: '#3B82F6',
+                female: '#EC4899',
+                other: '#10B981'
+            };
+            
+            if (position && position.member) {
+                const member = position.member;
+                const genderColor = genderColors[member.gender] || '#666';
+                const weightText = hideWeights ? '' : `<div style="font-size: 10px; color: #666;">${member.weight}kg</div>`;
+                
+                return `
+                    <div style="
+                        width: 80px; 
+                        height: 60px; 
+                        border: 2px solid ${genderColor}; 
+                        border-radius: 8px; 
+                        display: flex; 
+                        flex-direction: column; 
+                        align-items: center; 
+                        justify-content: center; 
+                        background: linear-gradient(135deg, ${genderColor}20, ${genderColor}10);
+                        font-size: 11px;
+                        text-align: center;
+                        padding: 4px;
+                    ">
+                        <div style="font-weight: bold; display: flex; align-items: center;">
+                            <div style="width: 8px; height: 8px; border-radius: 50%; background: ${genderColor}; margin-right: 4px;"></div>
+                            ${member.name}
+                        </div>
+                        ${weightText}
+                    </div>
+                `;
+            } else {
+                const label = positionId === 'drummer' ? 'Drummer' : 
+                             positionId === 'helm' ? 'Helm' : 
+                             positionId.charAt(0).toUpperCase() + positionId.slice(1);
+                return `
+                    <div style="
+                        width: 80px; 
+                        height: 60px; 
+                        border: 2px dashed #ccc; 
+                        border-radius: 8px; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        font-size: 11px;
+                        color: #666;
+                        font-weight: bold;
+                    ">
+                        ${label}
+                    </div>
+                `;
+            }
+        }
+        
+        function createStatisticsForImage() {
+            let totalWeight = 0;
+            let frontWeight = 0;
+            let rearWeight = 0;
+            let leftWeight = 0;
+            let rightWeight = 0;
+            let maleCount = 0;
+            let femaleCount = 0;
+            let otherCount = 0;
+            
+            for (const [positionId, position] of Object.entries(boatPositions)) {
+                if (!position.member) continue;
+                
+                const weight = position.member.weight;
+                const gender = position.member.gender;
+                totalWeight += weight;
+                
+                if (gender === 'male') maleCount++;
+                else if (gender === 'female') femaleCount++;
+                else otherCount++;
+                
+                if (position.type === 'drummer' || (position.type === 'paddler' && position.position <= paddlersPerSide / 2)) {
+                    frontWeight += weight;
+                } else {
+                    rearWeight += weight;
+                }
+                
+                if (position.side === 'left') {
+                    leftWeight += weight;
+                } else if (position.side === 'right') {
+                    rightWeight += weight;
+                }
+            }
+            
+            const frontRearDiff = Math.abs(frontWeight - rearWeight);
+            const leftRightDiff = Math.abs(leftWeight - rightWeight);
+            
+            return `
+                <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px;">
+                    <h3 style="text-align: center; margin-bottom: 15px; color: #333;">Crew Statistics</h3>
+                    <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
+                        <div style="margin: 10px; text-align: center;">
+                            <h4 style="margin: 0 0 5px 0; color: #5D5CDE;">Weight Balance</h4>
+                            <div style="font-size: 12px;">Total: ${totalWeight.toFixed(1)}kg</div>
+                            <div style="font-size: 12px;">Front: ${frontWeight.toFixed(1)}kg</div>
+                            <div style="font-size: 12px;">Rear: ${rearWeight.toFixed(1)}kg</div>
+                            <div style="font-size: 12px; color: ${frontRearDiff > 10 ? '#ef4444' : '#10b981'};">F/R Diff: ${frontRearDiff.toFixed(1)}kg</div>
+                            <div style="font-size: 12px;">Left: ${leftWeight.toFixed(1)}kg</div>
+                            <div style="font-size: 12px;">Right: ${rightWeight.toFixed(1)}kg</div>
+                            <div style="font-size: 12px; color: ${leftRightDiff > 5 ? '#ef4444' : '#10b981'};">L/R Diff: ${leftRightDiff.toFixed(1)}kg</div>
+                        </div>
+                        <div style="margin: 10px; text-align: center;">
+                            <h4 style="margin: 0 0 5px 0; color: #5D5CDE;">Gender Distribution</h4>
+                            <div style="font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 8px; height: 8px; border-radius: 50%; background: #3B82F6; margin-right: 4px;"></div>
+                                Male: ${maleCount}
+                            </div>
+                            <div style="font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 8px; height: 8px; border-radius: 50%; background: #EC4899; margin-right: 4px;"></div>
+                                Female: ${femaleCount}
+                            </div>
+                            <div style="font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; margin-right: 4px;"></div>
+                                Other: ${otherCount}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleWeightsDisplay() {
+            weightsHidden = !weightsHidden;
+            const button = document.getElementById('weightsToggleBtn');
+            
+            if (weightsHidden) {
+                button.textContent = '??? Show Weights';
+                button.className = 'px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors';
+            } else {
+                button.textContent = '??? Hide Weights';
+                button.className = 'px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors';
+            }
+            
+            // Re-render the boat positions to show/hide weights
+            renderBoatPositions();
+        }
+
+        // Enter key support for adding members
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && (e.target.id === 'memberName' || e.target.id === 'memberWeight')) {
+                addMember();
+            }
+        });
+    </script>
+</body>
+</html>
